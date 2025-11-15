@@ -1,4 +1,8 @@
 import { SimulatorState, Instruction, ReservationStation, FunctionalUnit, ROBEntry, OperationType } from "@/types/simulator";
+import { issueCycle } from "./tomasulo/issue-cycle";
+import { executeCycle } from "./tomasulo/execute-cycle";
+import { writeBackCycle } from "./tomasulo/writeback-cycle";
+import { commitCycle } from "./tomasulo/commit-cycle";
 
 const LATENCIES: Record<string, number> = {
   ADD: 2,
@@ -72,14 +76,29 @@ export function createInitialState(): SimulatorState {
 }
 
 export function stepCycle(state: SimulatorState): SimulatorState {
-  const newState = { ...state, cycle: state.cycle + 1 };
-  
-  // Simplified cycle step - in a real implementation, this would:
-  // 1. Try to commit from ROB head
-  // 2. Update functional units (decrement cycles)
-  // 3. Try to issue new instructions to RS
-  // 4. Handle branch resolution and speculation
-  
+  let newState = { ...state };
+
+  // Execute all 4 cycles in reverse pipeline order
+  // This ensures data flows correctly through the pipeline
+
+  // 1. Commit (in-order retirement from ROB head)
+  newState = commitCycle(newState);
+
+  // 2. WriteBack (CDB broadcast to ROB and RS)
+  newState = writeBackCycle(newState);
+
+  // 3. Execute (FU processing and countdown)
+  newState = executeCycle(newState);
+
+  // 4. Issue (dispatch new instructions to RS and ROB)
+  newState = issueCycle(newState);
+
+  // 5. Increment cycle counter
+  newState = {
+    ...newState,
+    cycle: newState.cycle + 1,
+  };
+
   return newState;
 }
 
