@@ -6,13 +6,16 @@ import { FunctionalUnits } from "@/components/FunctionalUnits";
 import { ReorderBuffer } from "@/components/ReorderBuffer";
 import { RegisterFile } from "@/components/RegisterFile";
 import { SimulatorMetrics } from "@/components/SimulatorMetrics";
+import { ProgramEditor } from "@/components/ProgramEditor";
 import { createInitialState, stepCycle, resetSimulator } from "@/lib/simulator-engine";
-import { SimulatorState } from "@/types/simulator";
+import { SimulatorState, Instruction } from "@/types/simulator";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 const Index = () => {
   const [state, setState] = useState<SimulatorState>(createInitialState());
   const [isRunning, setIsRunning] = useState(false);
+  const [showProgramEditor, setShowProgramEditor] = useState(false);
 
   const metrics = {
     cycle: state.cycle,
@@ -44,7 +47,23 @@ const Index = () => {
   };
 
   const handleLoadProgram = () => {
-    toast.info("Load program feature coming soon");
+    setShowProgramEditor(true);
+  };
+
+  const handleProgramLoaded = (instructions: Instruction[]) => {
+    // Reset simulator with new instructions
+    const newState = resetSimulator();
+    setState({
+      ...newState,
+      instructions: instructions.map((inst) => ({
+        ...inst,
+        state: "idle" as const,
+        isSpeculative: false,
+      })),
+    });
+    setShowProgramEditor(false);
+    setIsRunning(false);
+    toast.success(`Loaded ${instructions.length} instructions`);
   };
 
   const handleToggleSpeculation = (enabled: boolean) => {
@@ -112,6 +131,19 @@ const Index = () => {
           <SimulatorMetrics metrics={metrics} />
         </div>
       </div>
+
+      {/* Program Editor Dialog */}
+      <Dialog open={showProgramEditor} onOpenChange={setShowProgramEditor}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Load Program</DialogTitle>
+            <DialogDescription>
+              Write your own MIPS assembly program or select from presets
+            </DialogDescription>
+          </DialogHeader>
+          <ProgramEditor onProgramLoaded={handleProgramLoaded} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
