@@ -1,6 +1,9 @@
 import { SimulatorState } from "@/types/simulator";
 import { clearRATIfMatches } from "./rat";
 import { storeToMemory } from "./memory";
+import { flushSpeculativeState } from "./flush";
+import { findCheckpoint, removeCheckpoint } from "./checkpoint";
+import { updatePredictor } from "./branch-predictor";
 
 /**
  * Commit Cycle - Retire instruction from ROB head in-order
@@ -34,6 +37,18 @@ export function commitCycle(state: SimulatorState): SimulatorState {
     return state;
   }
 
+  // Block commit of speculative instructions until their branch resolves
+  if (headEntry.isSpeculative && headEntry.branchCheckpointId !== undefined) {
+    const dependentCheckpoint = state.branchCheckpoints.find(
+      (cp) => cp.id === headEntry.branchCheckpointId
+    );
+
+    if (dependentCheckpoint && !dependentCheckpoint.resolved) {
+      // Cannot commit until branch resolves - stall
+      return state;
+    }
+  }
+
   let newState = { ...state };
 
   // Commit based on instruction type
@@ -62,18 +77,65 @@ export function commitCycle(state: SimulatorState): SimulatorState {
       break;
 
     case "STORE":
-      // Write to memory
-      if (instruction.immediate !== undefined && headEntry.value !== undefined) {
-        // Calculate address (simplified - using immediate as address)
-        const address = instruction.immediate;
-        newState = storeToMemory(address, headEntry.value, newState);
+      // Write to memory using the address computed during issue
+      if (headEntry.address !== undefined && headEntry.value !== undefined) {
+        newState = storeToMemory(headEntry.address, headEntry.value, newState);
       }
       break;
 
-    case "BRANCH":
-      // Basic branch handling (Phase 3 will add full speculation)
-      // For now, just mark as committed
+    case "BRANCH": {
+      // Branch misprediction detection and recovery
+      const checkpoint = findCheckpoint(instructionId, newState);
+
+      if (checkpoint) {
+        // Branch value: 1 = taken, 0 = not taken
+        const actualTaken = headEntry.value === 1;
+
+        if (!checkpoint.correct) {
+          // MISPREDICTION DETECTED!
+          console.log(`[MISPREDICTION] Instruction ${instructionId} at cycle ${newState.cycle}`);
+
+          // 1. Flush speculative state
+          newState = flushSpeculativeState(checkpoint, newState);
+
+          // 2. Calculate correct PC
+          const branchTarget = checkpoint.pc + (instruction.immediate ?? 1);
+          const fallthrough = checkpoint.pc + 1;
+          const correctTarget = actualTaken ? branchTarget : fallthrough;
+
+          // 3. Update PC to correct path
+          newState = {
+            ...newState,
+            pc: correctTarget,
+          };
+
+          // 4. Increment misprediction counter
+          newState = {
+            ...newState,
+            mispredictionCount: newState.mispredictionCount + 1,
+          };
+        } else {
+          // Prediction was correct
+          newState = {
+            ...newState,
+            branchCorrect: newState.branchCorrect + 1,
+          };
+        }
+
+        // 5. Update branch predictor with actual outcome
+        updatePredictor(checkpoint.pc, actualTaken, newState.branchPredictor);
+
+        // 6. Increment total branches executed
+        newState = {
+          ...newState,
+          branchesExecuted: newState.branchesExecuted + 1,
+        };
+
+        // 7. Remove checkpoint (branch is now committed)
+        newState = removeCheckpoint(checkpoint.id, newState);
+      }
       break;
+    }
   }
 
   // Clear ROB entry

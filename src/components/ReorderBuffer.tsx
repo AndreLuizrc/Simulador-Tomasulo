@@ -1,6 +1,7 @@
 import { ROBEntry } from "@/types/simulator";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface ReorderBufferProps {
   entries: ROBEntry[];
@@ -35,6 +36,7 @@ export function ReorderBuffer({ entries, head, tail }: ReorderBufferProps) {
               <th className="px-3 py-2 text-left font-mono">Dest</th>
               <th className="px-3 py-2 text-left font-mono">Value</th>
               <th className="px-3 py-2 text-left">Ready</th>
+              <th className="px-3 py-2 text-left">Spec</th>
             </tr>
           </thead>
           <tbody>
@@ -78,6 +80,15 @@ export function ReorderBuffer({ entries, head, tail }: ReorderBufferProps) {
                     <span className="text-state-ready">✓</span>
                   ) : (
                     <span className="text-muted-foreground">○</span>
+                  )}
+                </td>
+                <td className="px-3 py-2">
+                  {entry.isSpeculative ? (
+                    <Badge variant="outline" className="text-xs bg-state-speculative/20 text-state-speculative border-state-speculative">
+                      S
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
                   )}
                 </td>
               </tr>

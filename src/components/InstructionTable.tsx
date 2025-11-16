@@ -44,11 +44,26 @@ export function InstructionTable({ instructions, currentCycle }: InstructionTabl
                 className={cn(
                   "border-b border-border transition-colors",
                   inst.state === "executing" && "bg-state-executing/10",
-                  inst.isSpeculative && "opacity-70"
+                  inst.state === "flushed" && "bg-state-flushed/20 line-through",
+                  inst.isSpeculative && inst.state !== "flushed" && "bg-state-speculative/10"
                 )}
               >
                 <td className="px-3 py-2 font-mono text-muted-foreground">{inst.id}</td>
-                <td className="px-3 py-2 font-mono">{inst.text}</td>
+                <td className="px-3 py-2 font-mono">
+                  <div className="flex items-center gap-2">
+                    <span>{inst.text}</span>
+                    {inst.isSpeculative && inst.state !== "flushed" && (
+                      <Badge variant="outline" className="text-xs bg-state-speculative/20 text-state-speculative border-state-speculative">
+                        SPEC
+                      </Badge>
+                    )}
+                    {inst.state === "flushed" && (
+                      <Badge variant="outline" className="text-xs bg-state-flushed/20 text-state-flushed border-state-flushed">
+                        FLUSHED
+                      </Badge>
+                    )}
+                  </div>
+                </td>
                 <td className="px-3 py-2">
                   <Badge className={cn("text-xs", stateColors[inst.state])}>
                     {inst.state}
