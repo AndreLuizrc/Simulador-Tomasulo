@@ -2,29 +2,34 @@ import { Button } from "@/components/ui/button";
 import { Play, Pause, SkipForward, RotateCcw, Upload } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ExecutionControlsProps {
   isRunning: boolean;
   isPaused: boolean;
   speculationEnabled: boolean;
+  branchPredictorType: 'static-taken' | 'static-not-taken' | '2-bit';
   onRun: () => void;
   onPause: () => void;
   onStep: () => void;
   onReset: () => void;
   onLoadProgram: () => void;
   onToggleSpeculation: (enabled: boolean) => void;
+  onChangePredictorType: (type: 'static-taken' | 'static-not-taken' | '2-bit') => void;
 }
 
 export function ExecutionControls({
   isRunning,
   isPaused,
   speculationEnabled,
+  branchPredictorType,
   onRun,
   onPause,
   onStep,
   onReset,
   onLoadProgram,
   onToggleSpeculation,
+  onChangePredictorType,
 }: ExecutionControlsProps) {
   return (
     <div className="border border-border rounded-lg bg-card p-4">
@@ -95,6 +100,27 @@ export function ExecutionControls({
             onCheckedChange={onToggleSpeculation}
           />
         </div>
+
+        {speculationEnabled && (
+          <div className="space-y-2 pt-2">
+            <Label htmlFor="predictor" className="text-sm">
+              Branch Predictor
+            </Label>
+            <Select
+              value={branchPredictorType}
+              onValueChange={(value) => onChangePredictorType(value as 'static-taken' | 'static-not-taken' | '2-bit')}
+            >
+              <SelectTrigger id="predictor" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="static-taken">Static Always Taken</SelectItem>
+                <SelectItem value="static-not-taken">Static Not Taken</SelectItem>
+                <SelectItem value="2-bit">2-Bit Saturating Counter</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -25,6 +25,7 @@ export interface Instruction {
   writebackTime?: number;
   commitTime?: number;
   isSpeculative: boolean;
+  speculativeDepth?: number; // Nested speculation depth
   robEntry?: number;
 }
 
@@ -65,6 +66,7 @@ export interface ROBEntry {
   value?: number;
   ready: boolean;
   isSpeculative: boolean;
+  branchCheckpointId?: number; // Which branch caused speculation
   address?: number; // Computed memory address for LOAD/STORE
 }
 
@@ -80,6 +82,27 @@ export interface BranchPrediction {
   predicted: boolean;
   actual?: boolean;
   resolved: boolean;
+}
+
+export interface BranchPredictorEntry {
+  state: 0 | 1 | 2 | 3; // 0=SNT, 1=WNT, 2=WT, 3=ST (2-bit saturating counter)
+}
+
+export interface BranchPredictor {
+  type: 'static-taken' | 'static-not-taken' | '2-bit';
+  table?: Map<number, BranchPredictorEntry>; // PC → state (for 2-bit predictor)
+}
+
+export interface BranchCheckpoint {
+  id: number;
+  instructionId: number;
+  pc: number;
+  ratSnapshot: RegisterRenaming[];
+  robTailSnapshot: number;
+  predictedTaken: boolean;
+  predictedTarget: number;
+  resolved: boolean;
+  correct?: boolean;
 }
 
 export interface CDBBroadcast {
@@ -104,6 +127,16 @@ export interface SimulatorState {
   speculationEnabled: boolean;
   isPaused: boolean;
   pendingBroadcasts: CDBBroadcast[]; // Queue for multiple FUs ready in same cycle
+  // Speculation fields
+  branchCheckpoints: BranchCheckpoint[];
+  nextCheckpointId: number;
+  pc: number; // Program counter
+  branchPredictor: BranchPredictor;
+  // Branch metrics
+  branchesExecuted: number;
+  branchCorrect: number;
+  mispredictionCount: number;
+  flushCount: number;
 }
 
 export interface SimulatorMetrics {

@@ -71,6 +71,22 @@ const Index = () => {
     toast.info(`Branch speculation ${enabled ? "enabled" : "disabled"}`);
   };
 
+  const handleChangePredictorType = (type: 'static-taken' | 'static-not-taken' | '2-bit') => {
+    setState(prev => ({
+      ...prev,
+      branchPredictor: {
+        type,
+        table: type === '2-bit' ? new Map() : undefined,
+      },
+    }));
+    const typeLabels = {
+      'static-taken': 'Static Always Taken',
+      'static-not-taken': 'Static Not Taken',
+      '2-bit': '2-Bit Saturating Counter'
+    };
+    toast.info(`Branch predictor changed to ${typeLabels[type]}`);
+  };
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-[1800px] mx-auto space-y-6">
@@ -97,12 +113,14 @@ const Index = () => {
               isRunning={isRunning}
               isPaused={state.isPaused}
               speculationEnabled={state.speculationEnabled}
+              branchPredictorType={state.branchPredictor.type}
               onRun={handleRun}
               onPause={handlePause}
               onStep={handleStep}
               onReset={handleReset}
               onLoadProgram={handleLoadProgram}
               onToggleSpeculation={handleToggleSpeculation}
+              onChangePredictorType={handleChangePredictorType}
             />
           </div>
         </div>

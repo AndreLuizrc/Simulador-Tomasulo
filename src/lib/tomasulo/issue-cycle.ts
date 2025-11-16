@@ -8,6 +8,8 @@ import {
 } from "./state-manager";
 import { updateRAT } from "./rat";
 import { calculateAddress } from "./memory";
+import { predictBranch } from "./branch-predictor";
+import { createCheckpoint, hasUnresolvedCheckpoints } from "./checkpoint";
 
 /**
  * Issue Cycle - Try to issue the next idle instruction
@@ -93,6 +95,67 @@ export function issueCycle(state: SimulatorState): SimulatorState {
     );
   }
 
+  // Branch prediction and checkpoint creation
+  let checkpointId: number | undefined;
+  let isInstructionSpeculative = false;
+
+  // Check if current instruction is being issued speculatively
+  if (hasUnresolvedCheckpoints(newState)) {
+    isInstructionSpeculative = true;
+    // Find the oldest unresolved checkpoint
+    const oldestUnresolved = newState.branchCheckpoints.find(cp => !cp.resolved);
+    if (oldestUnresolved) {
+      checkpointId = oldestUnresolved.id;
+    }
+  }
+
+  // Handle branch instructions (BEQ/BNE)
+  if (
+    (instruction.operation === "BEQ" || instruction.operation === "BNE") &&
+    newState.speculationEnabled
+  ) {
+    // Calculate branch target address
+    const branchTarget = (newState.pc || instruction.id) + (instruction.immediate ?? 1);
+    const fallthrough = (newState.pc || instruction.id) + 1;
+
+    // Make branch prediction
+    const prediction = predictBranch(
+      newState.pc || instruction.id,
+      newState.branchPredictor,
+      fallthrough
+    );
+
+    // Calculate actual target based on prediction
+    const predictedTarget = prediction.taken ? branchTarget : fallthrough;
+
+    // Create checkpoint for this branch
+    const checkpoint = createCheckpoint(
+      instruction.id,
+      newState.pc || instruction.id,
+      prediction,
+      predictedTarget,
+      newState
+    );
+
+    // Add checkpoint to state
+    newState = {
+      ...newState,
+      branchCheckpoints: [...newState.branchCheckpoints, checkpoint],
+      nextCheckpointId: newState.nextCheckpointId + 1,
+      pc: predictedTarget, // Update PC based on prediction
+    };
+
+    // Branch itself is not speculative, but it creates speculation
+    isInstructionSpeculative = false;
+    checkpointId = checkpoint.id;
+  } else if (instruction.operation !== "BEQ" && instruction.operation !== "BNE") {
+    // Update PC for non-branch instructions
+    newState = {
+      ...newState,
+      pc: (newState.pc || instruction.id) + 1,
+    };
+  }
+
   // Update ROB
   const newRob = [...newState.rob];
   newRob[robIndex] = {
@@ -103,7 +166,8 @@ export function issueCycle(state: SimulatorState): SimulatorState {
     destination: instruction.dest || undefined,
     value: undefined,
     ready: false,
-    isSpeculative: false, // Will be set in Phase 3
+    isSpeculative: isInstructionSpeculative,
+    branchCheckpointId: checkpointId,
     address, // Store computed address for LOAD/STORE
   };
 
@@ -141,6 +205,7 @@ export function issueCycle(state: SimulatorState): SimulatorState {
         state: "issued" as const,
         issueTime: newState.cycle,
         robEntry: robIndex,
+        isSpeculative: isInstructionSpeculative,
       };
     }
     return inst;

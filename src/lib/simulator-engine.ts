@@ -73,6 +73,19 @@ export function createInitialState(): SimulatorState {
     speculationEnabled: true,
     isPaused: false,
     pendingBroadcasts: [],
+    // Speculation fields
+    branchCheckpoints: [],
+    nextCheckpointId: 0,
+    pc: 0,
+    branchPredictor: {
+      type: '2-bit',
+      table: new Map(),
+    },
+    // Branch metrics
+    branchesExecuted: 0,
+    branchCorrect: 0,
+    mispredictionCount: 0,
+    flushCount: 0,
   };
 }
 
@@ -105,4 +118,46 @@ export function stepCycle(state: SimulatorState): SimulatorState {
 
 export function resetSimulator(): SimulatorState {
   return createInitialState();
+}
+
+/**
+ * Calculate branch prediction accuracy
+ * @param state - Current simulator state
+ * @returns Branch accuracy as a percentage (0-1)
+ */
+export function getBranchAccuracy(state: SimulatorState): number {
+  if (state.branchesExecuted === 0) {
+    return 1.0; // No branches executed yet, 100% accuracy
+  }
+  return state.branchCorrect / state.branchesExecuted;
+}
+
+/**
+ * Get comprehensive simulator metrics
+ * @param state - Current simulator state
+ * @returns Metrics object for display
+ */
+export function getSimulatorMetrics(state: SimulatorState): {
+  cycle: number;
+  instructionsCommitted: number;
+  ipc: number;
+  stallCycles: number;
+  flushCount: number;
+  branchAccuracy: number;
+} {
+  const ipc = state.cycle > 0 ? state.instructionsCommitted / state.cycle : 0;
+  const branchAccuracy = getBranchAccuracy(state);
+
+  // Calculate stall cycles (approximate: cycles where no instruction committed)
+  // This is a simple approximation - more sophisticated tracking could be added
+  const stallCycles = state.cycle - state.instructionsCommitted;
+
+  return {
+    cycle: state.cycle,
+    instructionsCommitted: state.instructionsCommitted,
+    ipc: Math.max(0, ipc),
+    stallCycles: Math.max(0, stallCycles),
+    flushCount: state.flushCount,
+    branchAccuracy,
+  };
 }

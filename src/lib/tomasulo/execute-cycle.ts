@@ -1,6 +1,7 @@
 import { SimulatorState, OperationType } from "@/types/simulator";
 import { findFreeFunctionalUnit, getReservationStationType } from "./state-manager";
 import { loadFromMemory } from "./memory";
+import { findCheckpoint, resolveCheckpoint } from "./checkpoint";
 
 // Operation latencies (in cycles)
 const LATENCIES: Record<OperationType, number> = {
@@ -125,6 +126,7 @@ function dispatchToFunctionalUnits(state: SimulatorState): SimulatorState {
  * Update functional units - decrement counters and compute results
  */
 function updateFunctionalUnits(state: SimulatorState): SimulatorState {
+  let newState = { ...state };
   const newFunctionalUnits = [...state.functionalUnits];
   const newInstructions = [...state.instructions];
 
@@ -163,12 +165,43 @@ function updateFunctionalUnits(state: SimulatorState): SimulatorState {
           state: "ready",
           execEndTime: state.cycle,
         };
+
+        // Branch resolution
+        if (instruction.operation === "BEQ" || instruction.operation === "BNE") {
+          const checkpoint = findCheckpoint(instruction.id, newState);
+
+          if (checkpoint && !checkpoint.resolved) {
+            // Determine actual branch outcome
+            const vj = fu.vj ?? 0;
+            const vk = fu.vk ?? 0;
+            const actualTaken =
+              instruction.operation === "BEQ" ? vj === vk : vj !== vk;
+
+            // Calculate actual target
+            const branchTarget =
+              (checkpoint.pc) + (instruction.immediate ?? 1);
+            const fallthrough = checkpoint.pc + 1;
+            const actualTarget = actualTaken ? branchTarget : fallthrough;
+
+            // Check if prediction was correct
+            const predictionCorrect =
+              checkpoint.predictedTaken === actualTaken &&
+              checkpoint.predictedTarget === actualTarget;
+
+            // Mark checkpoint as resolved
+            newState = resolveCheckpoint(
+              checkpoint.id,
+              predictionCorrect,
+              newState
+            );
+          }
+        }
       }
     }
   }
 
   return {
-    ...state,
+    ...newState,
     functionalUnits: newFunctionalUnits,
     instructions: newInstructions,
   };
