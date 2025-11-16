@@ -150,10 +150,9 @@ function convertInstruction(
       throw new Error(`Unsupported opcode: ${opcode}`);
   }
 
-  // Validate no writing to R0 (optional check)
-  if (instruction.dest === "R0" && opcode !== "STORE") {
-    // Warning: writing to R0 (could be enforced as error)
-    console.warn(`Warning: Instruction ${id} writes to R0 (zero register)`);
+  // Validate no writing to R0 (zero register guard)
+  if (instruction.dest === "R0" && opcode !== "STORE" && opcode !== "BEQ" && opcode !== "BNE") {
+    throw new Error(`Cannot write to register R0 (zero register). Instruction: ${text}`);
   }
 
   return instruction;

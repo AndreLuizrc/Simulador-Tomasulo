@@ -75,6 +75,24 @@ export function issueCycle(state: SimulatorState): SimulatorState {
       robType = "ALU";
   }
 
+  // Calculate address for LOAD/STORE before creating ROB entry
+  let address: number | undefined;
+  if (instruction.operation === "LOAD") {
+    // LOAD: src1 = base register, immediate = offset
+    address = calculateAddress(
+      instruction.src1,
+      instruction.immediate ?? 0,
+      newState
+    );
+  } else if (instruction.operation === "STORE") {
+    // STORE: dest = base register, immediate = offset
+    address = calculateAddress(
+      instruction.dest,
+      instruction.immediate ?? 0,
+      newState
+    );
+  }
+
   // Update ROB
   const newRob = [...newState.rob];
   newRob[robIndex] = {
@@ -86,20 +104,11 @@ export function issueCycle(state: SimulatorState): SimulatorState {
     value: undefined,
     ready: false,
     isSpeculative: false, // Will be set in Phase 3
+    address, // Store computed address for LOAD/STORE
   };
 
   // Update RS
   const newReservationStations = [...newState.reservationStations];
-
-  // Calculate address for LOAD/STORE
-  let address: number | undefined;
-  if (instruction.operation === "LOAD" || instruction.operation === "STORE") {
-    address = calculateAddress(
-      instruction.src1,
-      instruction.immediate ?? 0,
-      newState
-    );
-  }
 
   newReservationStations[rsIndex] = {
     ...newReservationStations[rsIndex],

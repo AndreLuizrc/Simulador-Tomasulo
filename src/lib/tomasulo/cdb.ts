@@ -42,6 +42,39 @@ export function selectForBroadcast(
 }
 
 /**
+ * Collect all functional units ready for broadcast
+ * Used to populate the CDB broadcast queue
+ * @param state - Current simulator state
+ * @returns Array of broadcasts from ready FUs
+ */
+export function collectReadyBroadcasts(
+  state: SimulatorState
+): Array<{ fuIndex: number; broadcast: CDBBroadcast }> {
+  const ready: Array<{ fuIndex: number; broadcast: CDBBroadcast }> = [];
+
+  for (let i = 0; i < state.functionalUnits.length; i++) {
+    const fu = state.functionalUnits[i];
+
+    if (fu.busy && fu.cyclesRemaining === 0 && fu.result !== undefined && fu.instructionId !== undefined) {
+      const instruction = state.instructions[fu.instructionId];
+
+      if (instruction && instruction.state === "ready" && instruction.robEntry !== undefined) {
+        ready.push({
+          fuIndex: i,
+          broadcast: {
+            robTag: instruction.robEntry,
+            value: fu.result,
+            instructionId: fu.instructionId,
+          },
+        });
+      }
+    }
+  }
+
+  return ready;
+}
+
+/**
  * Broadcast result on CDB and update all dependent structures
  * @param broadcast - Broadcast data
  * @param state - Current simulator state

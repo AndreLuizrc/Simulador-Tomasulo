@@ -62,11 +62,9 @@ export function commitCycle(state: SimulatorState): SimulatorState {
       break;
 
     case "STORE":
-      // Write to memory
-      if (instruction.immediate !== undefined && headEntry.value !== undefined) {
-        // Calculate address (simplified - using immediate as address)
-        const address = instruction.immediate;
-        newState = storeToMemory(address, headEntry.value, newState);
+      // Write to memory using the address computed during issue
+      if (headEntry.address !== undefined && headEntry.value !== undefined) {
+        newState = storeToMemory(headEntry.address, headEntry.value, newState);
       }
       break;
 

@@ -62,9 +62,15 @@ function dispatchToFunctionalUnits(state: SimulatorState): SimulatorState {
       continue;
     }
 
-    // Find free FU of the correct type
-    const fuIndex = findFreeFunctionalUnit(rs.type, state);
-    if (fuIndex === null) {
+    /// Find free FU of the correct type using the up-to-date snapshot
+    // Guard against double-dispatch if already bound
+    const alreadyBound = newFunctionalUnits.some((fu) => fu.instructionId ===       
+    rs.instructionId);
+    if (alreadyBound) {
+      continue;
+    }
+    const fuIndex = newFunctionalUnits.findIndex((fu) => fu.type === rs.type && !fu.busy);
+    if (fuIndex === -1) {
       continue; // No free FU, continue to next RS
     }
 

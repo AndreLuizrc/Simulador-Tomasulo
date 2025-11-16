@@ -65,6 +65,7 @@ export interface ROBEntry {
   value?: number;
   ready: boolean;
   isSpeculative: boolean;
+  address?: number; // Computed memory address for LOAD/STORE
 }
 
 export interface RegisterRenaming {
@@ -79,6 +80,12 @@ export interface BranchPrediction {
   predicted: boolean;
   actual?: boolean;
   resolved: boolean;
+}
+
+export interface CDBBroadcast {
+  robTag: number;
+  value: number;
+  instructionId: number;
 }
 
 export interface SimulatorState {
@@ -96,6 +103,7 @@ export interface SimulatorState {
   branchPredictions: BranchPrediction[];
   speculationEnabled: boolean;
   isPaused: boolean;
+  pendingBroadcasts: CDBBroadcast[]; // Queue for multiple FUs ready in same cycle
 }
 
 export interface SimulatorMetrics {

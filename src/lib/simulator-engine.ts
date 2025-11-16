@@ -72,6 +72,7 @@ export function createInitialState(): SimulatorState {
     branchPredictions: [],
     speculationEnabled: true,
     isPaused: false,
+    pendingBroadcasts: [],
   };
 }
 
