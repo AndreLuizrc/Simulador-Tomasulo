@@ -50,6 +50,10 @@ export interface FunctionalUnit {
   cyclesRemaining: number;
   totalCycles: number;
   result?: number;
+  operation?: OperationType;
+  vj?: number;
+  vk?: number;
+  address?: number;
 }
 
 export interface ROBEntry {
