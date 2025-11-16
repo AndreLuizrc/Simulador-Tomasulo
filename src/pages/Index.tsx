@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { InstructionTable } from "@/components/InstructionTable";
 import { ExecutionControls } from "@/components/ExecutionControls";
 import { ReservationStations } from "@/components/ReservationStations";
@@ -16,6 +16,7 @@ const Index = () => {
   const [state, setState] = useState<SimulatorState>(createInitialState());
   const [isRunning, setIsRunning] = useState(false);
   const [showProgramEditor, setShowProgramEditor] = useState(false);
+  const [speed, setSpeed] = useState<number>(3); // cycles per second
 
   const metrics = {
     cycle: state.cycle,
@@ -45,6 +46,36 @@ const Index = () => {
     setIsRunning(false);
     toast.success("Simulator reset");
   };
+
+  // Continuous execution effect
+  useEffect(() => {
+    if (!isRunning) return;
+
+    const id = window.setInterval(() => {
+      setState((prev) => {
+        // Completion condition: all committed OR pipeline fully idle
+        const allCommitted =
+          prev.instructions.length > 0 &&
+          prev.instructionsCommitted >= prev.instructions.length;
+        const pipelineIdle =
+          prev.reservationStations.every((rs) => !rs.busy) &&
+          prev.functionalUnits.every((fu) => !fu.busy) &&
+          prev.rob.every((e) => !e.busy) &&
+          prev.cycle > 0;
+
+        if (allCommitted || pipelineIdle) {
+          clearInterval(id);
+          setIsRunning(false);
+          toast.success("Program completed");
+          return prev;
+        }
+
+        return stepCycle(prev);
+      });
+    }, Math.max(50, Math.floor(1000 / Math.max(1, speed))));
+
+    return () => clearInterval(id);
+  }, [isRunning, speed]);
 
   const handleLoadProgram = () => {
     setShowProgramEditor(true);
@@ -114,6 +145,7 @@ const Index = () => {
               isPaused={state.isPaused}
               speculationEnabled={state.speculationEnabled}
               branchPredictorType={state.branchPredictor.type}
+              speed={speed}
               onRun={handleRun}
               onPause={handlePause}
               onStep={handleStep}
@@ -121,6 +153,7 @@ const Index = () => {
               onLoadProgram={handleLoadProgram}
               onToggleSpeculation={handleToggleSpeculation}
               onChangePredictorType={handleChangePredictorType}
+              onChangeSpeed={setSpeed}
             />
           </div>
         </div>
