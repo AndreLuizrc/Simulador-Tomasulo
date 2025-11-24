@@ -86,26 +86,57 @@ export function createInitialState(): SimulatorState {
     branchCorrect: 0,
     mispredictionCount: 0,
     flushCount: 0,
+    // Initialize new stall metrics
+    issueStalls: 0,
+    dataHazardStalls: 0,
+    structuralHazardStalls: 0,
+    cyclesWithAnyStall: 0, // Initialize new metric
   };
 }
 
+// Interfaces para os resultados dos ciclos
+interface CycleResult {
+  state: SimulatorState;
+  stallOccurredThisCycle: boolean;
+}
+
+// Modifique issueCycle para retornar um indicador de stall
+// Modifique executeCycle para retornar um indicador de stall
+
 export function stepCycle(state: SimulatorState): SimulatorState {
   let newState = { ...state };
-
-  // Execute all 4 cycles in reverse pipeline order
-  // This ensures data flows correctly through the pipeline
+  let currentCycleStallOccurred = false;
+  let preCommitFlushCount = newState.flushCount; // Capture flushCount before commit
 
   // 1. Commit (in-order retirement from ROB head)
   newState = commitCycle(newState);
+
+  // Check if a flush occurred during commit (e.g., branch misprediction resolved)
+  if (newState.flushCount > preCommitFlushCount) {
+    currentCycleStallOccurred = true;
+  }
 
   // 2. WriteBack (CDB broadcast to ROB and RS)
   newState = writeBackCycle(newState);
 
   // 3. Execute (FU processing and countdown)
-  newState = executeCycle(newState);
+  const executeResult = executeCycle(newState);
+  newState = executeResult.state;
+  if (executeResult.dataHazardOccurred || executeResult.structuralHazardOccurred) {
+    currentCycleStallOccurred = true;
+  }
 
   // 4. Issue (dispatch new instructions to RS and ROB)
-  newState = issueCycle(newState);
+  const issueResult = issueCycle(newState);
+  newState = issueResult.state;
+  if (issueResult.issueStallOccurred) {
+    currentCycleStallOccurred = true;
+  }
+
+  // Increment cyclesWithAnyStall if any stall occurred this cycle
+  if (currentCycleStallOccurred) {
+    newState = { ...newState, cyclesWithAnyStall: newState.cyclesWithAnyStall + 1 };
+  }
 
   // 5. Increment cycle counter
   newState = {
@@ -143,21 +174,29 @@ export function getSimulatorMetrics(state: SimulatorState): {
   ipc: number;
   stallCycles: number;
   flushCount: number;
+  issueStalls: number;
+  dataHazardStalls: number;
+  structuralHazardStalls: number;
+  cyclesWithAnyStall: number; // Add to return type
   branchAccuracy: number;
 } {
   const ipc = state.cycle > 0 ? state.instructionsCommitted / state.cycle : 0;
   const branchAccuracy = getBranchAccuracy(state);
 
-  // Calculate stall cycles (approximate: cycles where no instruction committed)
-  // This is a simple approximation - more sophisticated tracking could be added
-  const stallCycles = state.cycle - state.instructionsCommitted;
+  // The primary stallCycles metric now reflects cyclesWithAnyStall
+  // Individual stall types are still returned for detailed analysis.
+  const totalStallCycles = state.cyclesWithAnyStall;
 
   return {
     cycle: state.cycle,
     instructionsCommitted: state.instructionsCommitted,
     ipc: Math.max(0, ipc),
-    stallCycles: Math.max(0, stallCycles),
+    stallCycles: totalStallCycles,
     flushCount: state.flushCount,
+    issueStalls: state.issueStalls,
+    dataHazardStalls: state.dataHazardStalls,
+    structuralHazardStalls: state.structuralHazardStalls,
+    cyclesWithAnyStall: state.cyclesWithAnyStall, // Return the new metric
     branchAccuracy,
   };
 }

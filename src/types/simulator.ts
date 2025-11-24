@@ -137,13 +137,22 @@ export interface SimulatorState {
   branchCorrect: number;
   mispredictionCount: number;
   flushCount: number;
+  // New stall metrics
+  issueStalls: number;
+  dataHazardStalls: number;
+  structuralHazardStalls: number;
+  cyclesWithAnyStall: number; // New metric for cycles where at least one stall occurred
 }
 
 export interface SimulatorMetrics {
   cycle: number;
   instructionsCommitted: number;
   ipc: number;
-  stallCycles: number;
+  stallCycles: number; // This will now reflect cyclesWithAnyStall
   flushCount: number;
+  issueStalls: number;
+  dataHazardStalls: number;
+  structuralHazardStalls: number;
+  cyclesWithAnyStall: number;
   branchAccuracy: number;
 }

@@ -23,25 +23,44 @@ const LATENCIES: Record<OperationType, number> = {
  * 2. Countdown: Decrement cyclesRemaining for busy FUs
  * 3. Complete: When counter hits 0, compute result
  */
-export function executeCycle(state: SimulatorState): SimulatorState {
+export function executeCycle(state: SimulatorState): { state: SimulatorState; dataHazardOccurred: boolean; structuralHazardOccurred: boolean; } {
   let newState = { ...state };
+  let dataHazardOccurredThisCycle = false;
+  let structuralHazardOccurredThisCycle = false;
 
   // Step 1: Dispatch ready RS entries to FUs
-  newState = dispatchToFunctionalUnits(newState);
+  const dispatchResult = dispatchToFunctionalUnits(newState);
+  newState = dispatchResult.state;
+  dataHazardOccurredThisCycle = dispatchResult.dataHazardOccurred;
+  structuralHazardOccurredThisCycle = dispatchResult.structuralHazardOccurred;
 
   // Step 2: Update functional units (decrement counters and compute results)
   newState = updateFunctionalUnits(newState);
 
-  return newState;
+  // No longer incrementing stalls here. Stalls are accumulated in stepCycle.
+
+  return {
+    state: newState,
+    dataHazardOccurred: dataHazardOccurredThisCycle,
+    structuralHazardOccurred: structuralHazardOccurredThisCycle,
+  };
 }
 
 /**
  * Dispatch ready reservation stations to functional units
+ * Returns the new state and flags if data/structural hazards occurred this cycle.
  */
-function dispatchToFunctionalUnits(state: SimulatorState): SimulatorState {
+function dispatchToFunctionalUnits(state: SimulatorState): {
+  state: SimulatorState;
+  dataHazardOccurred: boolean;
+  structuralHazardOccurred: boolean;
+} {
   const newReservationStations = [...state.reservationStations];
   const newFunctionalUnits = [...state.functionalUnits];
   const newInstructions = [...state.instructions];
+
+  let dataHazardOccurred = false;
+  let structuralHazardOccurred = false;
 
   // Check each RS for readiness
   for (let rsIndex = 0; rsIndex < newReservationStations.length; rsIndex++) {
@@ -60,19 +79,23 @@ function dispatchToFunctionalUnits(state: SimulatorState): SimulatorState {
     // Check if operands are ready (no waiting tags)
     const operandsReady = rs.qj === undefined && rs.qk === undefined;
     if (!operandsReady) {
-      continue;
+      // Data hazard stall occurred in this cycle for at least one RS
+      dataHazardOccurred = true;
+      continue; // This RS is stalled, move to next
     }
 
-    /// Find free FU of the correct type using the up-to-date snapshot
     // Guard against double-dispatch if already bound
-    const alreadyBound = newFunctionalUnits.some((fu) => fu.instructionId ===       
+    const alreadyBound = newFunctionalUnits.some((fu) => fu.instructionId ===
     rs.instructionId);
     if (alreadyBound) {
       continue;
     }
+
     const fuIndex = newFunctionalUnits.findIndex((fu) => fu.type === rs.type && !fu.busy);
     if (fuIndex === -1) {
-      continue; // No free FU, continue to next RS
+      // Structural hazard stall occurred in this cycle for at least one RS
+      structuralHazardOccurred = true;
+      continue; // No free FU, move to next RS
     }
 
     // Dispatch to FU
@@ -115,10 +138,14 @@ function dispatchToFunctionalUnits(state: SimulatorState): SimulatorState {
   }
 
   return {
-    ...state,
-    reservationStations: newReservationStations,
-    functionalUnits: newFunctionalUnits,
-    instructions: newInstructions,
+    state: {
+      ...state,
+      reservationStations: newReservationStations,
+      functionalUnits: newFunctionalUnits,
+      instructions: newInstructions,
+    },
+    dataHazardOccurred,
+    structuralHazardOccurred,
   };
 }
 

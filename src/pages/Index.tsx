@@ -7,7 +7,7 @@ import { ReorderBuffer } from "@/components/ReorderBuffer";
 import { RegisterFile } from "@/components/RegisterFile";
 import { SimulatorMetrics } from "@/components/SimulatorMetrics";
 import { ProgramEditor } from "@/components/ProgramEditor";
-import { createInitialState, stepCycle, resetSimulator } from "@/lib/simulator-engine";
+import { createInitialState, stepCycle, resetSimulator, getSimulatorMetrics } from "@/lib/simulator-engine";
 import { SimulatorState, Instruction } from "@/types/simulator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -18,14 +18,7 @@ const Index = () => {
   const [showProgramEditor, setShowProgramEditor] = useState(false);
   const [speed, setSpeed] = useState<number>(3); // cycles per second
 
-  const metrics = {
-    cycle: state.cycle,
-    instructionsCommitted: state.instructionsCommitted,
-    ipc: state.cycle > 0 ? state.instructionsCommitted / state.cycle : 0,
-    stallCycles: 0,
-    flushCount: 0,
-    branchAccuracy: 1.0,
-  };
+  const metrics = getSimulatorMetrics(state);
 
   const handleStep = () => {
     setState(prevState => stepCycle(prevState));

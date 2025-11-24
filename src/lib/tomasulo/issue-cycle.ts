@@ -23,38 +23,45 @@ import { createCheckpoint, hasUnresolvedCheckpoints } from "./checkpoint";
  * 6. Update RAT for destination register
  * 7. Mark instruction as "issued"
  */
-export function issueCycle(state: SimulatorState): SimulatorState {
+export function issueCycle(state: SimulatorState): { state: SimulatorState; issueStallOccurred: boolean; } {
+  let newState = { ...state };
+  let issueStallOccurredThisCycle = false;
+
   // Find first idle instruction
-  const instruction = state.instructions.find((inst) => inst.state === "idle");
+  const instruction = newState.instructions.find((inst) => inst.state === "idle");
 
   if (!instruction) {
-    // No instructions to issue
-    return state;
+    // No instructions to issue, no stall specific to *this* cycle
+    return { state: newState, issueStallOccurred: false };
   }
 
-  // Check if instruction can be issued
-  if (!canIssue(instruction.id, state)) {
-    // Structural hazard - stall
-    return state;
+  // Check if instruction can be issued (ROB or RS full)
+  if (!canIssue(instruction.id, newState)) {
+    issueStallOccurredThisCycle = true;
   }
 
-  // Allocate ROB entry
-  const robIndex = findFreeROBEntry(state);
+  // Allocate ROB entry (re-check as state might have changed, or canIssue might have missed edge case)
+  const robIndex = findFreeROBEntry(newState);
   if (robIndex === null) {
-    return state; // Should not happen since canIssue checks this
+    issueStallOccurredThisCycle = true;
   }
 
   // Determine RS type
   const rsType = getReservationStationType(instruction.operation);
 
-  // Allocate RS entry
-  const rsIndex = findFreeReservationStation(rsType, state);
+  // Allocate RS entry (re-check as state might have changed, or canIssue might have missed edge case)
+  const rsIndex = findFreeReservationStation(rsType, newState);
   if (rsIndex === null) {
-    return state; // Should not happen since canIssue checks this
+    issueStallOccurredThisCycle = true;
   }
 
-  // Clone state for updates
-  let newState = { ...state };
+  // If an instruction cannot be issued due to any stall condition, return early with stall flag.
+  if (issueStallOccurredThisCycle) {
+    return { state: newState, issueStallOccurred: true };
+  }
+
+  // If we reach here, an instruction can be issued.
+  // The newState is already cloned at the top, so we continue modifying it.
 
   // Get operand values or ROB tags
   const src1Info = getRegisterValue(instruction.src1, newState);
@@ -215,11 +222,14 @@ export function issueCycle(state: SimulatorState): SimulatorState {
   const newRobTail = (robIndex + 1) % newState.rob.length;
 
   return {
-    ...newState,
-    instructions: newInstructions,
-    reservationStations: newReservationStations,
-    rob: newRob,
-    robTail: newRobTail,
-    registerRenaming: newRegisterRenaming,
+    state: {
+      ...newState,
+      instructions: newInstructions,
+      reservationStations: newReservationStations,
+      rob: newRob,
+      robTail: newRobTail,
+      registerRenaming: newRegisterRenaming,
+    },
+    issueStallOccurred: false,
   };
 }
