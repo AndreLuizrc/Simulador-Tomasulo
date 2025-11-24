@@ -6,6 +6,8 @@ interface ReservationStationsProps {
 }
 
 export function ReservationStations({ stations }: ReservationStationsProps) {
+
+  console.log(stations)
   return (
     <div className="border border-border rounded-lg overflow-hidden bg-card">
       <div className="border-b border-border bg-secondary px-4 py-2">

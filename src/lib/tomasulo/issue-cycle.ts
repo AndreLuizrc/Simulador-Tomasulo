@@ -182,7 +182,7 @@ export function issueCycle(state: SimulatorState): SimulatorState {
     vk: src2Info.value,
     qj: src1Info.robTag !== undefined ? `ROB${src1Info.robTag}` : undefined,
     qk: src2Info.robTag !== undefined ? `ROB${src2Info.robTag}` : undefined,
-    dest: instruction.dest || undefined,
+    dest: "ROB" + String(robIndex) || undefined,
     address,
     instructionId: instruction.id,
   };

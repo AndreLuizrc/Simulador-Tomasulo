@@ -118,6 +118,8 @@ const Index = () => {
     toast.info(`Branch predictor changed to ${typeLabels[type]}`);
   };
 
+  console.log(state)
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-[1800px] mx-auto space-y-6">
