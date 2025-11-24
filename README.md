@@ -1,73 +1,58 @@
-# Welcome to your Lovable project
+# Simulador Tomasulo
 
-## Project info
+Este projeto é um simulador interativo do algoritmo de Tomasulo, projetado para demonstrar o funcionamento da execução de instruções out-of-order em uma arquitetura de pipeline. Ele visualiza as etapas do algoritmo, incluindo o uso de Estações de Reserva (Reservation Stations), Buffer de Reordenação (Reorder Buffer - ROB), e o Barramento Comum de Dados (Common Data Bus - CDB). O simulador também incorpora o uso de Tabela de Renomeação de Registradores (Register Alias Table - RAT) e predição de desvios para otimizações de pipeline.
 
-**URL**: https://lovable.dev/projects/d31577bc-ee45-46ce-91de-8e8ec1a9b23c
+## Tecnologias Utilizadas
 
-## How can I edit this code?
+Este projeto é construído com:
 
-There are several ways of editing your application.
+-   **Vite**: Um bundler de próxima geração para desenvolvimento web.
+-   **TypeScript**: Um superconjunto tipado do JavaScript que compila para JavaScript puro.
+-   **React**: Uma biblioteca JavaScript para construir interfaces de usuário.
+-   **shadcn-ui**: Uma coleção de componentes UI reutilizáveis.
+-   **Tailwind CSS**: Um framework CSS utility-first para construção rápida de UIs.
 
-**Use Lovable**
+## Como Compilar e Executar o Projeto
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/d31577bc-ee45-46ce-91de-8e8ec1a9b23c) and start prompting.
+Para configurar e rodar este projeto em sua máquina local, siga os passos abaixo:
 
-Changes made via Lovable will be committed automatically to this repo.
+1.  **Clone o repositório:**
+    ```sh
+    git clone https://github.com/AndreLuizrc/Simulador-Tomasulo.git
+    ```
+2.  **Navegue até o diretório do projeto:**
+    ```sh
+    cd Simulador-Tomasulo
+    ```
+3.  **Instale as dependências:**
+    ```sh
+    npm install
+    ```
+4.  **Inicie o servidor de desenvolvimento:**
+    ```sh
+    npm run dev
+    ```
 
-**Use your preferred IDE**
+Após executar `npm run dev`, o simulador estará disponível no seu navegador em `http://localhost:5173` (ou outra porta disponível).
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Como Funciona o Algoritmo de Tomasulo no Simulador
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+O algoritmo de Tomasulo permite a execução de instruções out-of-order, minimizando os stalls causados por dependências de dados. No simulador, cada ciclo de clock processa as seguintes etapas na ordem apresentada (que é a ordem em que as atualizações de estado se propagam):
 
-Follow these steps:
+### 1. Commit (Retirada de Instruções)
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+Nesta fase, as instruções que já concluíram sua execução e escrita de resultados são retiradas do Buffer de Reordenação (ROB) em ordem. Se uma instrução no cabeçalho do ROB estiver pronta e não for uma instrução de desvio mal predita, seus resultados são confirmados no Register File (Arquivo de Registradores) ou na memória, e a entrada do ROB é liberada. No caso de uma predição de desvio incorreta, o pipeline é descarregado (flush), e o estado do simulador é restaurado para um ponto de controle anterior.
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 2. WriteBack (Escrita de Resultados)
 
-# Step 3: Install the necessary dependencies.
-npm i
+Instruções que concluíram sua fase de execução nas Unidades Funcionais (Functional Units - FUs) transmitem seus resultados através do Common Data Bus (CDB). As Estações de Reserva (Reservation Stations - RS) e o Buffer de Reordenação (ROB) "escutam" o CDB para atualizar seus operandos com os valores que estão sendo transmitidos, resolvendo dependências de dados.
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+### 3. Execute (Execução de Instruções)
 
-**Edit a file directly in GitHub**
+As instruções nas Estações de Reserva que possuem todos os seus operandos disponíveis (seja do Register File ou do CDB) iniciam ou continuam sua execução nas Unidades Funcionais correspondentes. Cada unidade funcional possui uma latência específica (e.g., ADD: 2 ciclos, MUL: 4 ciclos), e as instruções permanecem nesta fase até que seu tempo de execução seja completado.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### 4. Issue (Despacho de Instruções)
 
-**Use GitHub Codespaces**
+Nesta fase, uma nova instrução é lida da memória de instruções. Se houver uma Estação de Reserva disponível para o tipo de operação da instrução e uma entrada livre no Buffer de Reordenação (ROB), a instrução é despachada. Os operandos são buscados no Register File ou na Register Alias Table (RAT) se eles estiverem pendentes de cálculo em outra instrução (indicando uma dependência de nome). A instrução é então colocada na Estação de Reserva e uma entrada é alocada no ROB.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/d31577bc-ee45-46ce-91de-8e8ec1a9b23c) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Essas quatro fases são repetidas a cada ciclo de clock, permitindo a execução paralela e out-of-order de instruções e a visualização do estado do pipeline em tempo real.
